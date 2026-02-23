@@ -1,0 +1,34 @@
+node_modules/
+cache/
+artifacts/
+typechain-types/
+
+# Python
+venv/
+pqc_env/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+
+# Keys (never commit private keys!)
+keys/*.bin
+keys/signing_data.json
+keys/tx_receipt.json
+keys/keygen_summary.json
+
+# Contract address (environment-specific)
+python/contract_address.txt
+
+# Environment
+.env
+.env.local
+*.env
+
+# OS
+.DS_Store
+Thumbs.db
