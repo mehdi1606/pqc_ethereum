@@ -1,8 +1,14 @@
 #!/usr/bin/env python3
 """
 SIGNING SCRIPT
-Loads keys, signs a message with Dilithium3 + Falcon-512,
-computes hybrid commitment H = keccak256(sig || pk || keccak256(msg))
+Loads keys, signs a message with Dilithium3 + Falcon-512, and computes the
+hybrid DUAL-signature commitment from Theorem 1 of the paper:
+
+    H = keccak256(sigD || sigF || pkD || pkF || keccak256(msg))
+
+Both signatures and both public keys are bound into the single 32-byte
+commitment, so the joint quantum-forgery bound (2^-231) applies to the exact
+object that is anchored on-chain.
 Run: python python/sign_message.py
 """
 import oqs
@@ -43,16 +49,19 @@ t_fal = (time.perf_counter() - t0) * 1000
 print(f'    Signature size : {len(sig_falcon):,} bytes')
 print(f'    Signing time   : {t_fal:.2f} ms')
 
-# ── Compute hybrid hash commitment ────────────────────────────────────────
-print('\n[3] Computing hybrid commitment H...')
+# ── Compute hybrid DUAL-signature hash commitment ─────────────────────────
+print('\n[3] Computing hybrid dual-signature commitment H...')
 w3 = Web3()  # used only for keccak256
 
-# H = keccak256(sigma_dilithium || pk_dilithium || keccak256(MESSAGE))
-msg_hash    = w3.keccak(MESSAGE)                          # 32 bytes
-commit_data = sig_dilithium + dil_pk + bytes(msg_hash)    # concatenate
-H           = w3.keccak(commit_data)                      # final 32-byte hash
+# H = keccak256(sigD || sigF || pkD || pkF || keccak256(MESSAGE))   (Theorem 1)
+msg_hash    = w3.keccak(MESSAGE)                                       # 32 bytes
+commit_data = sig_dilithium + sig_falcon + dil_pk + fal_pk + bytes(msg_hash)
+H           = w3.keccak(commit_data)                                  # final 32-byte hash
 
 print(f'    keccak256(message)    : {msg_hash.hex()}')
+print(f'    Commitment preimage   : {len(commit_data):,} bytes '
+      f'(sigD {len(sig_dilithium)} + sigF {len(sig_falcon)} + '
+      f'pkD {len(dil_pk)} + pkF {len(fal_pk)} + H(m) 32)')
 print(f'    Commitment H (32B)    : {H.hex()}')
 print(f'    H as bytes32 (0x...)  : 0x{H.hex()}')
 
@@ -65,7 +74,7 @@ signing_data = {
     'sig_falcon_hex':    sig_falcon.hex(),
     'dil_pk_hex':        dil_pk.hex(),
     'fal_pk_hex':        fal_pk.hex(),
-    'algorithm_primary': 'Dilithium3',
+    'algorithm_primary': 'Dilithium3+Falcon-512',
     'timing': {
         'dilithium3_sign_ms': round(t_dil, 3),
         'falcon512_sign_ms':  round(t_fal, 3)

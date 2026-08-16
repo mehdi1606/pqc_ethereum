@@ -44,10 +44,8 @@ ABI = [
         'type': 'function',
         'inputs': [{'name': 'commitment', 'type': 'bytes32'}],
         'outputs': [
-            {'name': 'exists',    'type': 'bool'},
-            {'name': 'signer',    'type': 'address'},
-            {'name': 'timestamp', 'type': 'uint256'},
-            {'name': 'algo',      'type': 'string'}
+            {'name': 'exists', 'type': 'bool'},
+            {'name': 'signer', 'type': 'address'}
         ],
         'stateMutability': 'view'
     },
@@ -104,12 +102,13 @@ print(f'  Status       : {"SUCCESS" if receipt["status"]==1 else "FAILED"}')
 print(f'  Tx hash      : {receipt["transactionHash"].hex()}')
 
 # ── Verify on-chain storage ───────────────────────────────────────────────
-exists, signer, timestamp, algo = contract.functions.checkCommitment(h_bytes32).call()
+# Only (exists, signer) live in storage now; algorithm/timestamp/CID are in the
+# emitted event (kept out of storage to hold the anchor at a single SSTORE ~46k gas).
+exists, signer = contract.functions.checkCommitment(h_bytes32).call()
 print(f'\n=== ON-CHAIN VERIFICATION ===')
 print(f'  Commitment exists : {exists}')
 print(f'  Anchored by       : {signer}')
-print(f'  Timestamp         : {timestamp}')
-print(f'  Algorithm         : {algo}')
+print(f'  Algorithm         : {algorithm} (from event / signing_data)')
 
 # Save receipt
 receipt_data = {

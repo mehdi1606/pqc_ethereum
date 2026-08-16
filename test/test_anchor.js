@@ -50,8 +50,9 @@ describe('PQCAnchor Contract Tests', function () {
     const receipt = await tx.wait();
     console.log(`    Actual gas:    ${receipt.gasUsed.toString()}`);
 
-    // Gas should be under 250,000 for a simple commitment
-    expect(Number(receipt.gasUsed)).to.be.lessThan(250000);
+    // Single cold SSTORE design (Table 7): a full anchor should cost ~46k gas.
+    // Assert it stays well under 60k, confirming the gas-optimised storage layout.
+    expect(Number(receipt.gasUsed)).to.be.lessThan(60000);
   });
 
   // ── TEST 3: Prevent duplicate commitments ────────────────────────────
@@ -80,20 +81,22 @@ describe('PQCAnchor Contract Tests', function () {
     console.log(`    All gas values: [${gasValues.join(', ')}]`);
   });
 
-  // ── TEST 5: On-chain hash computation helper ─────────────────────────
-  it('Should compute commitment hash on-chain matching off-chain Python', async function () {
-    const fakeSig = ethers.toUtf8Bytes('fake_dilithium3_signature_bytes');
-    const fakePK  = ethers.toUtf8Bytes('fake_dilithium3_public_key_bytes');
+  // ── TEST 5: On-chain dual-signature hash computation helper ──────────
+  it('Should compute the dual-signature commitment on-chain matching off-chain', async function () {
+    const sigD    = ethers.toUtf8Bytes('fake_dilithium3_signature_bytes');
+    const sigF    = ethers.toUtf8Bytes('fake_falcon512_signature_bytes');
+    const pkD     = ethers.toUtf8Bytes('fake_dilithium3_public_key_bytes');
+    const pkF     = ethers.toUtf8Bytes('fake_falcon512_public_key_bytes');
     const msgHash = ethers.keccak256(ethers.toUtf8Bytes('test message'));
 
-    const onchainH = await contract.computeCommitment(fakeSig, fakePK, msgHash);
+    const onchainH = await contract.computeCommitment(sigD, sigF, pkD, pkF, msgHash);
 
-    // Verify this matches what Python computes:
-    // H = keccak256(sig_bytes || pk_bytes || msg_hash_bytes)
+    // Verify this matches Theorem 1 / the Python off-chain computation:
+    // H = keccak256(sigD || sigF || pkD || pkF || keccak256(msg))
     const offchainH = ethers.keccak256(
-      ethers.concat([fakeSig, fakePK, msgHash])
+      ethers.concat([sigD, sigF, pkD, pkF, msgHash])
     );
     expect(onchainH).to.equal(offchainH);
-    console.log(`    Commitment H: ${onchainH}`);
+    console.log(`    Dual-signature commitment H: ${onchainH}`);
   });
 });

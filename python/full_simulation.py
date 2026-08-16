@@ -76,17 +76,18 @@ t_fal = (time.perf_counter()-t0)*1000
 print(f'  Signature: {len(sig_fal)} bytes | Time: {t_fal:.2f} ms')
 
 # ============================================================
-banner('PHASE 4: COMPUTE HASH COMMITMENT (off-chain)')
+banner('PHASE 4: COMPUTE DUAL-SIGNATURE HASH COMMITMENT (off-chain)')
 # ============================================================
 w3 = Web3(Web3.HTTPProvider('http://127.0.0.1:8545'))
 
-msg_hash    = w3.keccak(MESSAGE)                        # keccak256(M)
-commit_data = sig_dil + dil_pk + bytes(msg_hash)        # concat
-H           = w3.keccak(commit_data)                    # final H
+# H = keccak256(sigD || sigF || pkD || pkF || keccak256(M))   (Theorem 1)
+msg_hash    = w3.keccak(MESSAGE)                                    # keccak256(M)
+commit_data = sig_dil + sig_fal + dil_pk + fal_pk + bytes(msg_hash) # concat
+H           = w3.keccak(commit_data)                               # final H
 H_hex       = '0x' + H.hex()
 
 print(f'  keccak256(Message) = {msg_hash.hex()}')
-print(f'  H = keccak256(sigma||pk||H(M)) = {H_hex}')
+print(f'  H = keccak256(sigD||sigF||pkD||pkF||H(M)) = {H_hex}')
 
 # ============================================================
 banner('PHASE 5: ANCHOR ON ETHEREUM (on-chain)')
@@ -112,7 +113,7 @@ acct = Account.from_key(HARDHAT_PK)
 
 nonce = w3.eth.get_transaction_count(acct.address)
 txn = contract.functions.anchorCommitment(
-    bytes.fromhex(H_hex[2:]), 'ipfs://QmSimulatedCID', 'Dilithium3'
+    bytes.fromhex(H_hex[2:]), 'ipfs://QmSimulatedCID', 'Dilithium3+Falcon-512'
 ).build_transaction({'from': acct.address, 'nonce': nonce, 'gas': 250000, 'gasPrice': w3.to_wei('1', 'gwei')})
 
 signed  = acct.sign_transaction(txn)
@@ -128,7 +129,7 @@ print(f'  Status           : {"SUCCESS" if receipt["status"]==1 else "FAILED"}')
 banner('PHASE 6: OFF-CHAIN VERIFICATION')
 # ============================================================
 # Step 6a: Recompute H and check
-H_recomputed = '0x' + w3.keccak(sig_dil + dil_pk + bytes(msg_hash)).hex()
+H_recomputed = '0x' + w3.keccak(sig_dil + sig_fal + dil_pk + fal_pk + bytes(msg_hash)).hex()
 hash_ok = H_recomputed.lower() == H_hex.lower()
 print(f'  Hash recomputed : {H_recomputed}')
 print(f'  Hash match      : {"YES" if hash_ok else "NO"}')
