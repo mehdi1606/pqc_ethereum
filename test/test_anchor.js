@@ -50,8 +50,9 @@ describe('PQCAnchor Contract Tests', function () {
     const receipt = await tx.wait();
     console.log(`    Actual gas:    ${receipt.gasUsed.toString()}`);
 
-    // Gas should be under 250,000 for a simple commitment
-    expect(Number(receipt.gasUsed)).to.be.lessThan(250000);
+    // Measured cold anchor gas: ~184,000 (includes string ipfsCID + algorithm storage)
+    // Bound = measured 184,434 + 15% margin
+    expect(Number(receipt.gasUsed)).to.be.lessThan(212000);
   });
 
   // ── TEST 3: Prevent duplicate commitments ────────────────────────────

@@ -2,7 +2,7 @@
 """
 SIGNING SCRIPT
 Loads keys, signs a message with Dilithium3 + Falcon-512,
-computes hybrid commitment H = keccak256(sig || pk || keccak256(msg))
+computes hybrid commitment H = keccak256(sig_D || sig_F || pk_D || pk_F || keccak256(msg))
 Run: python python/sign_message.py
 """
 import oqs
@@ -47,10 +47,10 @@ print(f'    Signing time   : {t_fal:.2f} ms')
 print('\n[3] Computing hybrid commitment H...')
 w3 = Web3()  # used only for keccak256
 
-# H = keccak256(sigma_dilithium || pk_dilithium || keccak256(MESSAGE))
-msg_hash    = w3.keccak(MESSAGE)                          # 32 bytes
-commit_data = sig_dilithium + dil_pk + bytes(msg_hash)    # concatenate
-H           = w3.keccak(commit_data)                      # final 32-byte hash
+# H = keccak256(sig_dilithium || sig_falcon || pk_dilithium || pk_falcon || keccak256(message))
+msg_hash    = w3.keccak(MESSAGE)                                              # 32 bytes
+commit_data = sig_dilithium + sig_falcon + dil_pk + fal_pk + bytes(msg_hash) # concatenate
+H           = w3.keccak(commit_data)                                          # final 32-byte hash
 
 print(f'    keccak256(message)    : {msg_hash.hex()}')
 print(f'    Commitment H (32B)    : {H.hex()}')
