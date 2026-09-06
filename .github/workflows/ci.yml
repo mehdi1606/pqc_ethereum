@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ── Solidity / Hardhat tests ──────────────────────────────────────────────
+  hardhat:
+    name: Hardhat tests (Solidity)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Audit for high/critical vulnerabilities
+        run: npm audit --audit-level=high
+
+      - name: Compile contracts
+        run: npx hardhat compile
+
+      - name: Run Hardhat tests
+        run: npx hardhat test
+
+  # ── Python unit tests ─────────────────────────────────────────────────────
+  python:
+    name: Python tests (pytest)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: "pip"
+
+      - name: Install Python dependencies
+        # Install web3 and pytest; skip oqs (liboqs) because the pure-function
+        # tests do not exercise it and the library needs native libs to build.
+        run: pip install web3 eth-account pysha3 python-dotenv pytest
+
+      - name: Run pytest
+        run: pytest tests/ -v --tb=short
