@@ -6,8 +6,12 @@ PREREQUISITE: Hardhat node must be running (npx hardhat node)
 Run: python python/anchor_onchain.py
 """
 import json
+import os
 from web3 import Web3
 from eth_account import Account
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # ── Load signing data ─────────────────────────────────────────────────────
 with open('keys/signing_data.json') as f:
@@ -67,8 +71,8 @@ ABI = [
 contract = w3.eth.contract(address=contract_address, abi=ABI)
 
 # ── Use first Hardhat test account as signer ────────────────────────────────
-# Hardhat account #0 private key (public, fixed for local dev only)
-HARDHAT_PK = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80'
+# Private key loaded from .env (see .env.example); never hard-code real keys
+HARDHAT_PK = os.environ['HARDHAT_PK']
 account = Account.from_key(HARDHAT_PK)
 print(f'Sender address: {account.address}')
 print(f'Balance       : {w3.from_wei(w3.eth.get_balance(account.address), "ether"):.4f} ETH')

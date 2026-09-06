@@ -8,6 +8,9 @@ Run: python python/full_simulation.py
 import oqs, json, time, os
 from web3 import Web3
 from eth_account import Account
+from dotenv import load_dotenv
+
+load_dotenv()
 
 def banner(title):
     print('\n' + '='*60)
@@ -47,10 +50,22 @@ print(f'  Done in {(time.perf_counter()-t0)*1000:.2f} ms | PK: {len(kyb_pk)} B |
 banner('PHASE 2: KYBER KEY ENCAPSULATION (off-chain)')
 # ============================================================
 print('-> Sender encapsulates shared secret using recipient Kyber PK...')
+t0 = time.perf_counter()
 with oqs.KeyEncapsulation('Kyber768') as sender:
-    ciphertext, shared_secret = sender.encap_secret(kyb_pk)
-print(f'  Ciphertext: {len(ciphertext)} bytes')
-print(f'  Shared secret (first 16B): {shared_secret[:16].hex()}')
+    ciphertext, shared_secret_sender = sender.encap_secret(kyb_pk)
+t_encap = (time.perf_counter()-t0)*1000
+print(f'  Ciphertext: {len(ciphertext)} bytes | Encap time: {t_encap:.2f} ms')
+print(f'  Shared secret (first 16B): {shared_secret_sender[:16].hex()}')
+
+print('-> Receiver decapsulates to recover shared secret...')
+t0 = time.perf_counter()
+with oqs.KeyEncapsulation('Kyber768', kyb_sk) as receiver:
+    shared_secret_receiver = receiver.decap_secret(ciphertext)
+t_decap = (time.perf_counter()-t0)*1000
+print(f'  Decap time: {t_decap:.2f} ms')
+
+kem_ok = (shared_secret_sender == shared_secret_receiver)
+print(f'  Shared secrets match: {"YES" if kem_ok else "NO"}')
 print(f'  (Use shared_secret as AES-256-GCM key to encrypt message)')
 
 # ============================================================
@@ -80,13 +95,13 @@ banner('PHASE 4: COMPUTE HASH COMMITMENT (off-chain)')
 # ============================================================
 w3 = Web3(Web3.HTTPProvider('http://127.0.0.1:8545'))
 
-msg_hash    = w3.keccak(MESSAGE)                        # keccak256(M)
-commit_data = sig_dil + dil_pk + bytes(msg_hash)        # concat
-H           = w3.keccak(commit_data)                    # final H
+msg_hash    = w3.keccak(MESSAGE)                                        # keccak256(M)
+commit_data = sig_dil + sig_fal + dil_pk + fal_pk + bytes(msg_hash)    # concat
+H           = w3.keccak(commit_data)                                    # final H
 H_hex       = '0x' + H.hex()
 
 print(f'  keccak256(Message) = {msg_hash.hex()}')
-print(f'  H = keccak256(sigma||pk||H(M)) = {H_hex}')
+print(f'  H = keccak256(sig_D||sig_F||pk_D||pk_F||H(M)) = {H_hex}')
 
 # ============================================================
 banner('PHASE 5: ANCHOR ON ETHEREUM (on-chain)')
@@ -107,7 +122,7 @@ ABI = [{
     ], 'outputs': [], 'stateMutability': 'nonpayable'
 }]
 contract = w3.eth.contract(address=addr, abi=ABI)
-HARDHAT_PK = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80'
+HARDHAT_PK = os.environ['HARDHAT_PK']
 acct = Account.from_key(HARDHAT_PK)
 
 nonce = w3.eth.get_transaction_count(acct.address)
@@ -128,7 +143,7 @@ print(f'  Status           : {"SUCCESS" if receipt["status"]==1 else "FAILED"}')
 banner('PHASE 6: OFF-CHAIN VERIFICATION')
 # ============================================================
 # Step 6a: Recompute H and check
-H_recomputed = '0x' + w3.keccak(sig_dil + dil_pk + bytes(msg_hash)).hex()
+H_recomputed = '0x' + w3.keccak(sig_dil + sig_fal + dil_pk + fal_pk + bytes(msg_hash)).hex()
 hash_ok = H_recomputed.lower() == H_hex.lower()
 print(f'  Hash recomputed : {H_recomputed}')
 print(f'  Hash match      : {"YES" if hash_ok else "NO"}')
@@ -154,15 +169,19 @@ banner('SIMULATION COMPLETE -- FINAL REPORT')
 print(f"""
   ALGORITHM PERFORMANCE SUMMARY
   +-----------------------------------------------------+
-  |  Dilithium3 sign       : {t_dil:.2f} ms
-  |  Falcon-512 sign       : {t_fal:.2f} ms
-  |  Dilithium3 verify     : {t_v:.3f} ms
-  |  Falcon-512 verify     : {t_v2:.3f} ms
+  |  Kyber768 encapsulation : {t_encap:.2f} ms
+  |  Kyber768 decapsulation : {t_decap:.2f} ms
+  |  KEM shared secret match: {"YES" if kem_ok else "NO"}
   +-----------------------------------------------------+
-  |  Ethereum gas used     : {receipt["gasUsed"]:,}
-  |  Hash match            : {hash_ok}
-  |  Dilithium3 valid      : {dil_ok}
-  |  Falcon-512 valid      : {fal_ok}
-  |  OVERALL STATUS        : SYSTEM SECURE
+  |  Dilithium3 sign        : {t_dil:.2f} ms
+  |  Falcon-512 sign        : {t_fal:.2f} ms
+  |  Dilithium3 verify      : {t_v:.3f} ms
+  |  Falcon-512 verify      : {t_v2:.3f} ms
+  +-----------------------------------------------------+
+  |  Ethereum gas used      : {receipt["gasUsed"]:,}
+  |  Hash match             : {hash_ok}
+  |  Dilithium3 valid       : {dil_ok}
+  |  Falcon-512 valid       : {fal_ok}
+  |  OVERALL STATUS         : SYSTEM SECURE
   +-----------------------------------------------------+
 """)
