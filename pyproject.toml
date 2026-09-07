@@ -1,0 +1,15 @@
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+
+[tool.ruff.lint]
+# E/W: pycodestyle  F: pyflakes  I: isort  UP: pyupgrade
+select = ["E", "W", "F", "I", "UP"]
+ignore = [
+    "E501",   # line too long (handled by line-length above)
+    "UP007",  # use X | Y for union types — requires Py3.10+ runtime union
+    "UP038",  # isinstance(x, (A, B)) -> isinstance(x, A | B) — keep compat form
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["F401"]  # imported but unused (fixtures often look this way)

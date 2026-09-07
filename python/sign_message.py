@@ -11,9 +11,10 @@ commitment, so the joint quantum-forgery bound (2^-231) applies to the exact
 object that is anchored on-chain.
 Run: python python/sign_message.py
 """
-import oqs
 import json
 import time
+
+import oqs
 from web3 import Web3
 
 # ── The message to sign ────────────────────────────────────────────────────
@@ -21,7 +22,8 @@ MESSAGE = b'This document certifies the transfer of asset #4721 from Alice to Bo
 
 # ── Load keys from disk ────────────────────────────────────────────────────
 def load_key(path):
-    with open(path, 'rb') as f: return f.read()
+    with open(path, 'rb') as f:
+        return f.read()
 
 dil_pk = load_key('keys/dilithium3_pk.bin')
 dil_sk = load_key('keys/dilithium3_sk.bin')

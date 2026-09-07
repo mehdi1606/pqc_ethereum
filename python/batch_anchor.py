@@ -7,12 +7,12 @@ PREREQUISITE: Hardhat node must be running and contract deployed.
 Run: python python/batch_anchor.py
 """
 import json
-import os
 import math
-import time
-from web3 import Web3
-from eth_account import Account
+import os
+
 from dotenv import load_dotenv
+from eth_account import Account
+from web3 import Web3
 
 load_dotenv()
 
@@ -98,7 +98,6 @@ def generate_commitments(n: int, seed: int = 0) -> list[bytes]:
 
 def send_anchor(root_bytes: bytes, nonce: int, batch_size: int) -> dict:
     """Anchor a Merkle root on-chain and return gas info."""
-    root_hex     = '0x' + root_bytes.hex()
     ipfs_cid     = f'bafkrei_merkle_batch_{batch_size}'
     algorithm    = 'Dilithium3+Falcon512-MerkleRoot'
 

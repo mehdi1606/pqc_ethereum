@@ -4,10 +4,11 @@ KEY GENERATION SCRIPT
 Generates: Dilithium3, Falcon-512, Kyber-768 key pairs
 Run: python python/keygen.py
 """
-import oqs
-import os
 import json
+import os
 import time
+
+import oqs
 
 os.makedirs('keys', exist_ok=True)
 
@@ -19,19 +20,19 @@ def generate_and_save(alg_name, alg_type='sig'):
         with oqs.Signature(alg_name) as signer:
             public_key  = signer.generate_keypair()
             private_key = signer.export_secret_key()
-            details = signer.details
     elif alg_type == 'kem':
         with oqs.KeyEncapsulation(alg_name) as kem:
             public_key  = kem.generate_keypair()
             private_key = kem.export_secret_key()
-            details = kem.details
 
     elapsed = (time.perf_counter() - start) * 1000
 
     # Save keys as binary files
     safe_name = alg_name.lower().replace('-', '').replace('_', '')
-    with open(f'keys/{safe_name}_pk.bin', 'wb') as f: f.write(public_key)
-    with open(f'keys/{safe_name}_sk.bin', 'wb') as f: f.write(private_key)
+    with open(f'keys/{safe_name}_pk.bin', 'wb') as f:
+        f.write(public_key)
+    with open(f'keys/{safe_name}_sk.bin', 'wb') as f:
+        f.write(private_key)
 
     print(f'  Algorithm  : {alg_name}')
     print(f'  Public key : {len(public_key):,} bytes  ->  keys/{safe_name}_pk.bin')

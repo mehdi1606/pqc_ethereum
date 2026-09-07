@@ -18,12 +18,13 @@ PREREQUISITE: Hardhat node running + contract deployed (address in
 python/contract_address.txt). Run keygen is not required — keys are made in-memory.
 Run:  python python/merkle_batch.py
 """
-import os
 import json
+import os
+
 import oqs
-from web3 import Web3
-from eth_account import Account
 from dotenv import load_dotenv
+from eth_account import Account
+from web3 import Web3
 
 load_dotenv()
 
@@ -59,8 +60,10 @@ def merkle_root(leaves):
 
 # ── Build MAX_N dual-signature commitment leaves once ──────────────────────
 print(f'Generating {MAX_N:,} dual-signature commitment leaves (one keypair reused)...')
-dil = oqs.Signature('Dilithium3'); dil_pk = dil.generate_keypair()
-fal = oqs.Signature('Falcon-512'); fal_pk = fal.generate_keypair()
+dil = oqs.Signature('Dilithium3')
+dil_pk = dil.generate_keypair()
+fal = oqs.Signature('Falcon-512')
+fal_pk = fal.generate_keypair()
 
 leaves = []
 for i in range(MAX_N):
