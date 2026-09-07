@@ -23,6 +23,9 @@ import json
 import oqs
 from web3 import Web3
 from eth_account import Account
+from dotenv import load_dotenv
+
+load_dotenv()
 
 os.makedirs('keys', exist_ok=True)
 
@@ -87,7 +90,7 @@ ABI = [{
 }]
 contract = w3.eth.contract(address=contract_address, abi=ABI)
 
-HARDHAT_PK = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80'
+HARDHAT_PK = os.environ['HARDHAT_PK']  # load from .env — see .env.example
 acct = Account.from_key(HARDHAT_PK)
 
 
