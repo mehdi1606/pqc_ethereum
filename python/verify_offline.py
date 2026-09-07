@@ -38,15 +38,14 @@ dil_pk_bytes  = bytes.fromhex(signing_data['dil_pk_hex'])
 fal_pk_bytes  = bytes.fromhex(signing_data['fal_pk_hex'])
 
 print(f'  Message ({len(MESSAGE)} bytes): {MESSAGE[:50]}...')
-print(f'  Dilithium3 sig size : {len(sig_dil_bytes):,} bytes')
-print(f'  Falcon-512 sig size : {len(sig_fal_bytes):,} bytes')
-print(f'  Dilithium3 PK size  : {len(dil_pk_bytes):,} bytes')
-print(f'  Falcon-512 PK size  : {len(fal_pk_bytes):,} bytes')
+print(f'  Dilithium3 sig / pk : {len(sig_dil_bytes):,} B / {len(dil_pk_bytes):,} B')
+print(f'  Falcon-512 sig / pk : {len(sig_fal_bytes):,} B / {len(fal_pk_bytes):,} B')
 
-# ── Step 3: Recompute commitment and compare to on-chain H ────────────────
-print('\n[STEP 3] Recomputing commitment hash...')
+# ── Step 3: Recompute dual-signature commitment and compare to on-chain H ──
+print('\n[STEP 3] Recomputing hybrid dual-signature commitment hash...')
 w3 = Web3()
 msg_hash    = w3.keccak(MESSAGE)
+# H = keccak256(sigD || sigF || pkD || pkF || keccak256(msg))   (Theorem 1)
 commit_data = sig_dil_bytes + sig_fal_bytes + dil_pk_bytes + fal_pk_bytes + bytes(msg_hash)
 H_computed  = '0x' + w3.keccak(commit_data).hex()
 
@@ -60,28 +59,28 @@ if not hash_match:
     print('ABORT: Hash mismatch -- signature data has been modified!')
     exit(1)
 
-# ── Step 4: PQC signature verification ───────────────────────────────────
+# ── Step 4: PQC signature verification (both schemes) ─────────────────────
 print('\n[STEP 4] Running PQC signature verification (Dilithium3 + Falcon-512)...')
 t0 = time.perf_counter()
 with oqs.Signature('Dilithium3') as verifier:
     dil_valid = verifier.verify(MESSAGE, sig_dil_bytes, dil_pk_bytes)
-t_dil_verify = (time.perf_counter() - t0) * 1000
-print(f'  Dilithium3 result : {"VALID" if dil_valid else "INVALID"} | Time: {t_dil_verify:.3f} ms')
+t_dil = (time.perf_counter() - t0) * 1000
 
 t0 = time.perf_counter()
 with oqs.Signature('Falcon-512') as verifier:
     fal_valid = verifier.verify(MESSAGE, sig_fal_bytes, fal_pk_bytes)
-t_fal_verify = (time.perf_counter() - t0) * 1000
-print(f'  Falcon-512 result : {"VALID" if fal_valid else "INVALID"} | Time: {t_fal_verify:.3f} ms')
+t_fal = (time.perf_counter() - t0) * 1000
 
 is_valid = dil_valid and fal_valid
+print(f'  Dilithium3 verification : {"VALID" if dil_valid else "INVALID"} ({t_dil:.3f} ms)')
+print(f'  Falcon-512 verification : {"VALID" if fal_valid else "INVALID"} ({t_fal:.3f} ms)')
 
 # ── Final summary ─────────────────────────────────────────────────────────
 print('\n' + '=' * 55)
 print('  VERIFICATION SUMMARY')
 print('=' * 55)
-print(f'  Hash commitment match  : {hash_match}')
-print(f'  Dilithium3 sig valid   : {dil_valid}')
-print(f'  Falcon-512 sig valid   : {fal_valid}')
-print(f'  OVERALL RESULT         : {"TRUSTED" if (hash_match and is_valid) else "UNTRUSTED"}')
+print(f'  Hash commitment match : {hash_match}')
+print(f'  Dilithium3 valid      : {dil_valid}')
+print(f'  Falcon-512 valid      : {fal_valid}')
+print(f'  OVERALL RESULT        : {"TRUSTED" if (hash_match and is_valid) else "UNTRUSTED"}')
 print('=' * 55)

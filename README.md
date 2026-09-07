@@ -7,14 +7,15 @@ Post-Quantum Cryptography anchored to Ethereum using CRYSTALS-Dilithium, Falcon,
 Signs messages with quantum-resistant algorithms off-chain, computes a compact 32-byte commitment hash, and anchors it on an Ethereum smart contract — providing a tamper-evident, publicly verifiable record.
 
 ```
-Off-chain (Python/liboqs)               On-chain (Solidity/Ethereum)
-──────────────────────────────────────  ────────────────────────────────────
-Dilithium3 + Falcon-512 sign        →   PQCAnchor.anchorCommitment()
-Kyber-768 key encapsulation             stores H on-chain (~184,000 gas cold)
-H = keccak256(sig_D||sig_F||pk_D||pk_F||H(msg))
-                                    →   Merkle-tree batching: ~122,000 gas
-                                        per-sig cost drops >99% at N≥500
+Off-chain (Python/liboqs)                 On-chain (Solidity/Ethereum)
+─────────────────────────                 ────────────────────────────
+Dilithium3 + Falcon-512 sign          →   PQCAnchor.anchorCommitment()
+Kyber-768 key encapsulation               stores commitment => signer (1 SSTORE)
+H = keccak256(sigD||sigF||pkD||pkF||H(m)) →   ~46,000 gas per anchor
 ```
+
+The commitment binds **both** PQC signatures and **both** public keys (Theorem 1),
+so the joint quantum-forgery bound covers the exact object anchored on-chain.
 
 ## Algorithms
 
@@ -33,17 +34,19 @@ pqc_ethereum/
 ├── scripts/
 │   └── deploy.js              <- Hardhat deployment script
 ├── test/
-│   ├── test_anchor.js         <- Hardhat tests (gas, events, duplicates)
-│   └── test_batch.js          <- Merkle-tree batch anchoring tests
+│   ├── test_anchor.js         <- Hardhat JavaScript tests
+│   └── test_merkle_batch.js   <- Merkle batch gas tests (Table 8)
 ├── python/
 │   ├── keygen.py              <- PQC key generation
-│   ├── sign_message.py        <- Dual-sig (Dilithium3 + Falcon-512) & commitment
-│   ├── verify_offline.py      <- Verifies both signatures + commitment hash
-│   ├── kyber_exchange.py      <- Full KEM: encapsulation + decapsulation
-│   ├── anchor_onchain.py      <- Submit commitment H to Ethereum
-│   ├── full_simulation.py     <- Complete end-to-end run
-│   ├── benchmark.py           <- 1,000-iteration benchmark (Table 6)
-│   └── batch_anchor.py        <- Merkle-tree batch anchoring (Table 8)
+│   ├── sign_message.py        <- Dual-signature hash commitment
+│   ├── verify_offline.py      <- Off-chain verification
+│   ├── kyber_exchange.py      <- Key encapsulation demo
+│   ├── anchor_onchain.py      <- Submit to Ethereum
+│   ├── benchmark.py           <- 1,000-iteration latency benchmark (Table 6)
+│   ├── batch_anchor.py        <- Merkle batch anchoring sweep (Table 8)
+│   ├── commitment.py          <- Importable commitment hash functions
+│   └── full_simulation.py     <- Complete end-to-end run
+├── tests/                     <- Python unit tests (pytest, no Hardhat needed)
 ├── keys/                      <- Generated keys (git-ignored)
 ├── hardhat.config.js
 └── package.json
@@ -135,67 +138,32 @@ Or run everything at once:
 python python/full_simulation.py
 ```
 
-### Benchmark (Table 6)
+### Reproduce the paper tables
 
 ```bash
-python python/benchmark.py
+python python/benchmark.py           # Table 6: latencies over 1,000 iterations
+python python/batch_anchor.py        # Table 8: Merkle batch gas / cost per signature
+                                     # (needs a running node + deployed contract)
 ```
 
-Run 1,000 independent iterations per operation and reproduce Table 6 from the paper.
-
-### Merkle-tree batch anchoring (Table 8)
-
+Table 8 is also reproduced purely on-chain (no Python/liboqs needed) by:
 ```bash
-# Requires Hardhat node running and contract deployed (see above)
-python python/batch_anchor.py
+npx hardhat test test/test_merkle_batch.js
 ```
 
 ## Gas Costs
 
-Measured on Hardhat with Solidity optimizer (200 runs), 20 Gwei gas price, ETH = $3,000.
+Per-anchor storage is a single `commitment => signer` slot (one cold SSTORE), so a
+full anchoring transaction costs ~46,000 gas (see paper Table 7). Auxiliary data
+(algorithm, IPFS CID, timestamp) is carried in events only.
 
-| Operation | Gas (measured) | @ 20 Gwei |
+| Operation | Gas | @ 20 Gwei |
 |---|---|---|
-| anchorCommitment — cold (first anchor, long ipfsCID) | ~184,000 | ~$11.04 |
-| anchorCommitment — warm (same contract, short ipfsCID) | ~122,000 | ~$7.32 |
-| Merkle root anchor (N=1) | ~140,000 | ~$8.40 |
-| Per-sig cost via Merkle batching (N=500) | ~246 gas | ~$0.015 |
-| Per-sig cost via Merkle batching (N=1,000) | ~123 gas | ~$0.007 |
-| On L2 (Arbitrum/Optimism) | same gas | ~$0.05–$1.00 |
-
-> **Note:** The paper's Table 7 cites ~46,000 gas based on a minimal bytes32-only store.
-> The deployed contract stores two dynamic strings (ipfsCID + algorithm name) on-chain,
-> each string requiring one or two additional cold SSTORE operations.
-> The cost drops dramatically with Merkle-tree batching (Table 8).
-
-## Simulation Results
-
-Run `python python/benchmark.py` to reproduce. Example output format (Table 6):
-
-| Operation | Mean (ms) | Min (ms) | Max (ms) | σ (ms) |
-|---|---|---|---|---|
-| Kyber768 key generation | — | — | — | — |
-| Kyber768 encapsulation | — | — | — | — |
-| Kyber768 decapsulation | — | — | — | — |
-| Dilithium3 key generation | — | — | — | — |
-| Dilithium3 sign (32 B) | — | — | — | — |
-| Dilithium3 sign (256 B) | — | — | — | — |
-| Dilithium3 sign (1024 B) | — | — | — | — |
-| Dilithium3 verification | — | — | — | — |
-| Falcon-512 key generation | — | — | — | — |
-| Falcon-512 signing (256 B) | — | — | — | — |
-| Falcon-512 verification | — | — | — | — |
-| keccak256 commitment (dual-sig) | — | — | — | — |
-
-Hardware reference (paper): Intel Core i7-12700K, 32 GB RAM, Ubuntu 22.04 LTS, liboqs 0.9.0 AVX2.
-
-## Security Metrics
-
-| Metric | Value | Meaning |
-|---|---|---|
-| QARL | > 99.9% | Joint attack probability = 2^−231; resistance = (1 − 2^−231) × 100% |
-| QSM | 100% | Dilithium3 offers 128-bit post-quantum security; ECDSA offers 0-bit |
-| COE | ~0.92 | Cryptographic overhead efficiency vs. SSCA baseline [11] |
+| anchorCommitment | ~46,000 | ~$2.78 |
+| anchorMerkleRoot (any N) | ~46,000 | ~$2.78 total |
+| Merkle batch, per signature (N=100) | ~460 | ~$0.03 |
+| Merkle batch, per signature (N=1000) | ~46 | ~$0.003 |
+| On L2 (Arbitrum/Optimism) | same gas | ~$0.03–$0.40 |
 
 ## Troubleshooting
 
