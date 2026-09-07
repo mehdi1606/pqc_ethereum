@@ -1,7 +1,7 @@
 # Core runtime dependencies (pinned to exact versions for reproducibility)
 # Update via: pip install -U <pkg> and re-pin
 liboqs>=0.10.0          # native build; version floated because CI skips it
-web3==7.14.1
+web3==8.0.0
 eth-account==0.13.7
 pysha3>=1.0.2           # keccak helper used by web3
 python-dotenv==1.0.1
