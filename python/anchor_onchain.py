@@ -10,6 +10,7 @@ import os
 from web3 import Web3
 from eth_account import Account
 from dotenv import load_dotenv
+from commitment import validate_commitment, validate_address
 
 load_dotenv()
 
@@ -75,8 +76,12 @@ account = Account.from_key(HARDHAT_PK)
 print(f'Sender address: {account.address}')
 print(f'Balance       : {w3.from_wei(w3.eth.get_balance(account.address), "ether"):.4f} ETH')
 
-# ── Estimate gas ──────────────────────────────────────────────────────────
+# ── Validate inputs before touching the chain ────────────────────────────
 h_bytes32 = bytes.fromhex(H[2:])   # strip '0x', convert to bytes
+validate_commitment(h_bytes32)
+validate_address(contract_address)
+
+# ── Estimate gas ──────────────────────────────────────────────────────────
 estimated_gas = contract.functions.anchorCommitment(
     h_bytes32, ipfs_cid, algorithm
 ).estimate_gas({'from': account.address})

@@ -12,7 +12,7 @@ import pytest
 # Make the python/ package importable from the repo root
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'python'))
 
-from commitment import compute_commitment, keccak256
+from commitment import compute_commitment, keccak256, validate_commitment, validate_address
 
 # ---------------------------------------------------------------------------
 # Fixed-size synthetic key/signature material (realistic byte lengths)
@@ -144,3 +144,54 @@ class TestComputeCommitment:
         h_orig    = compute_commitment(SIG_D, SIG_F, PK_D, PK_F, bytes(original_msg))
         h_tampered = compute_commitment(SIG_D, SIG_F, PK_D, PK_F, bytes(tampered_msg))
         assert h_orig != h_tampered
+
+
+# ---------------------------------------------------------------------------
+# Validator tests
+# ---------------------------------------------------------------------------
+
+class TestValidateCommitment:
+    def test_valid_32_bytes_passes(self):
+        validate_commitment(bytes(32))  # no exception
+
+    def test_wrong_length_raises(self):
+        with pytest.raises(ValueError, match='32 bytes'):
+            validate_commitment(bytes(31))
+        with pytest.raises(ValueError, match='32 bytes'):
+            validate_commitment(bytes(33))
+
+    def test_empty_raises(self):
+        with pytest.raises(ValueError):
+            validate_commitment(b'')
+
+    def test_non_bytes_raises(self):
+        with pytest.raises(TypeError):
+            validate_commitment('0x' + 'ab' * 32)   # str instead of bytes
+
+    def test_bytearray_accepted(self):
+        validate_commitment(bytearray(32))  # no exception
+
+
+class TestValidateAddress:
+    def test_valid_address_passes(self):
+        validate_address('0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266')
+
+    def test_missing_0x_raises(self):
+        with pytest.raises(ValueError, match='0x'):
+            validate_address('f39Fd6e51aad88F6F4ce6aB8827279cffFb92266')
+
+    def test_too_short_raises(self):
+        with pytest.raises(ValueError):
+            validate_address('0xabcd')
+
+    def test_too_long_raises(self):
+        with pytest.raises(ValueError):
+            validate_address('0x' + 'ab' * 21)
+
+    def test_non_hex_raises(self):
+        with pytest.raises(ValueError):
+            validate_address('0x' + 'zz' * 20)
+
+    def test_non_str_raises(self):
+        with pytest.raises(TypeError):
+            validate_address(b'0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266')
