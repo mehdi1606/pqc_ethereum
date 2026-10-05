@@ -4,7 +4,7 @@ liboqs>=0.10.0          # native build; version floated because CI skips it
 web3==7.14.1
 eth-account==0.13.7
 pysha3>=1.0.2           # keccak helper used by web3
-python-dotenv==1.0.1
+python-dotenv==1.2.4
 
 # Test dependencies
 pytest==8.3.3
